@@ -16,6 +16,7 @@ def init(db_name=DB_NAME) -> None:
             version TEXT DEFAULT ""
         );
     """)
+#    cursor.execute(f"DROP TABLE IF EXISTS F1;")
     conn.commit()
     cursor.close()
     conn.close()
@@ -92,7 +93,7 @@ def get_system(name: str, db_name=DB_NAME) -> dict | None:
     res = cursor.fetchone()
     cursor.close()
     conn.close()
-    if res is None: return {}
+    if res is None: return None
     return {
         "name": res[0],
         "title": res[1],
@@ -113,6 +114,27 @@ def delete_system(name: str, db_name=DB_NAME) -> bool:
         conn.close()
     except Exception as err:
         print(f"Error. Can't delete system '{name}': {err}")
+        return False
+    return True
+
+def clone_system(name: str, new_name: str, db_name=DB_NAME) -> bool:
+    """Clone system"""
+    if not name or not new_name: return False
+    sys_info = get_system(name, db_name)
+    if not sys_info: return False
+    try:
+        conn = sqlite3.connect(db_name)
+        cursor = conn.cursor()
+        cursor.execute(f"CREATE TABLE {new_name} AS SELECT * FROM {name};")
+        cursor.execute("""
+            INSERT INTO all_systems (name, title, description, version) 
+            VALUES (?, ?, ?, ?);""",
+            (new_name, sys_info["title"] + " *(copy)*", sys_info["description"], sys_info["version"]))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as err:
+        print(f"Error. Can't clone system '{name}': {err}")
         return False
     return True
 

@@ -17,6 +17,25 @@ def delete_system_dialog(sys_name: str):
         st.session_state.edit_system = None
         st.rerun()
 
+@st.dialog("Clone system", dismissible=False)
+def clone_system_dialog(sys_name: str):
+    if not sys_name: return
+    st.subheader(f"Create a copy of '**{sys_name}**'")
+    new_name = st.text_input("New short name", key="new_name")
+    if new_name in db.systems():
+        st.error("This name is already in use!")
+        new_name = ""
+    col_yes, col_no = st.columns(2)
+    if col_yes.button("✅ Yes") and new_name:
+        if db.clone_system(sys_name, new_name):
+            st.session_state.curr_system = new_name
+        st.session_state.edit_system = None
+        st.rerun()
+    if col_no.button("❌ Cancel"):
+        st.session_state.edit_system = None
+        st.rerun()
+
+
 @st.dialog("Edit bid", width="medium", dismissible=False)
 def edit_bid_dialog(sys_name: str, seq: str):
     if not sys_name: return

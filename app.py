@@ -1,6 +1,6 @@
 from config import st
 import db
-from dialogs import edit_bid_dialog, delete_system_dialog, delete_bid_dialog
+from dialogs import edit_bid_dialog, delete_system_dialog, delete_bid_dialog, clone_system_dialog
 from models import Bid
 
 
@@ -40,10 +40,11 @@ def main():
 #  Browse System
     if st.session_state.curr_system and not st.session_state.edit_system:
         sys_info = db.get_system(st.session_state.curr_system)
-        col1, col2 = st.columns([15, 1])
+        col1, col2, col3 = st.columns([27, 3, 2])
         col1.subheader(sys_info.get("title", "---"))
-        if col2.button("❌", key="delete_system_button", help=f"Delete System {sys_info.get('name', '')}"):
-            delete_system_dialog(sys_info.get("title", "---"))
+        if col2.button("➕📄", key="clone_system_button", help=f"Clone System {sys_info.get('name', '')}"):
+            st.session_state.edit_system = "clone"
+        if col3.button("❌", key="delete_system_button", help=f"Delete System {sys_info.get('name', '')}"):
             st.session_state.edit_system = "delete"
         col1, col2 = st.columns([15, 1])
         with col1.expander(f"Version {sys_info.get('version')}", icon="📄"):
@@ -106,15 +107,19 @@ def main():
         else:
             st.warning(f"System {st.session_state.curr_system} not found!")
 
-# Delete System dialog
+# Open delete system dialog
     if st.session_state.edit_system == "delete":
         delete_system_dialog(st.session_state.curr_system)
 
-# Edit bid dialog
+# Open clone system dialog
+    if st.session_state.edit_system == "clone":
+        clone_system_dialog(st.session_state.curr_system)
+
+# Open edit bid dialog
     if ("edit_bid" in st.session_state) and st.session_state.edit_bid:
         edit_bid_dialog(st.session_state.curr_system, st.session_state.edit_bid)
 
-# Delete bid with answers dialog
+# Open delete bid with answers dialog
     if ("delete_bid" in st.session_state) and st.session_state.delete_bid:
         delete_bid_dialog(st.session_state.curr_system, st.session_state.delete_bid)
 
