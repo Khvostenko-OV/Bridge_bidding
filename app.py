@@ -1,25 +1,30 @@
 from config import st
 import db
-from dialogs import edit_bid_dialog, delete_system_dialog, delete_bid_dialog, clone_system_dialog
+from dialogs import edit_bid_dialog, delete_system_dialog, delete_bid_dialog, clone_system_dialog, login_dialog
 from models import Bid
+from utils import repl_str
 
 
 def display_bid(bid: Bid):
-    col1, col2 = st.columns([15, 1])
-    with col1.expander(bid.to_str, False):
+    col1, col2 = st.columns([19, 1])
+    with col1.expander(bid.to_markdown, False, ):
         for next_bid in bid.children:
             display_bid(next_bid)
-        col3, col4 = st.columns([1, 12])
-        if col3.button("➕", key=f"add_{bid.full_seq}"):
+        col3, col4 = st.columns([1, 9])
+        if col3.button("➕", key=f"add_{bid.full_seq}") and st.session_state.user:
             db.add_answers(st.session_state.curr_system, bid.full_seq)
             st.rerun()
-        if bid.children and col4.button("❌", key=f"del_{bid.full_seq}"):
+        if bid.children and col4.button("❌", key=f"del_{bid.full_seq}") and st.session_state.user:
             st.session_state.delete_bid = bid.children[-1].full_seq
-    if col2.button("✏️", key=f"edit_{bid.full_seq}"):
+    if col2.button("✏️", key=f"edit_{bid.full_seq}") and st.session_state.user:
         st.session_state.edit_bid = bid.full_seq
 
 def main():
     st.set_page_config(page_title="Bridge bidding systems", layout="wide")
+    if "user" not in st.session_state:
+        st.session_state.user = ""
+    if "show_login" not in st.session_state:
+        st.session_state.show_login = True
     if "edit_system" not in st.session_state:
         st.session_state.edit_system = None
     if "curr_system" not in st.session_state:
@@ -32,34 +37,41 @@ def main():
         st.header("Bridge bidding")
     elif system_name and system_name != st.session_state.curr_system and not st.session_state.edit_system:
         st.session_state.curr_system = system_name
+        if st.session_state.user:
+            db.change_user(st.session_state.user, st.session_state.curr_system)
         st.rerun()
 
-    if st.sidebar.button("Add System"):
+    if st.session_state.show_login:
+        login_dialog()
+
+    if st.session_state.user and st.sidebar.button("Add System"):
         st.session_state.edit_system = "add"
 
 #  Browse System
     if st.session_state.curr_system and not st.session_state.edit_system:
         sys_info = db.get_system(st.session_state.curr_system)
-        col1, col2, col3 = st.columns([27, 3, 2])
+        col1, col2, col3 = st.columns([35, 3, 2])
         col1.subheader(sys_info.get("title", "---"))
-        if col2.button("➕📄", key="clone_system_button", help=f"Clone System {sys_info.get('name', '')}"):
+        if col2.button("➕📄", key="clone_system_button", help=f"Clone System") and st.session_state.user:
             st.session_state.edit_system = "clone"
-        if col3.button("❌", key="delete_system_button", help=f"Delete System {sys_info.get('name', '')}"):
+        if col3.button("❌", key="delete_system_button", help=f"Delete System") and st.session_state.user:
             st.session_state.edit_system = "delete"
-        col1, col2 = st.columns([15, 1])
-        with col1.expander(f"Version {sys_info.get('version')}", icon="📄"):
+        col1, col2 = st.columns([19, 1])
+        with col1.expander(
+                f"Version {sys_info.get('version')} | Creator: {sys_info.get('owner_name') or sys_info.get('owner')}",
+                icon="📄"):
             st.markdown(f"{sys_info.get("description")}")
-        if col2.button("✏️", key="edit_system_button", help=f"Edit System description"):
+        if col2.button("✏️", key="edit_system_button", help=f"Edit System description") and st.session_state.user:
             st.session_state.edit_system = "edit"
             st.rerun()
         openings = db.build_tree(st.session_state.curr_system)
         for bid in openings:
             display_bid(bid)
-        col1, col2 = st.columns([1, 15])
-        if col1.button("➕", key="add_"):
+        col1, col2 = st.columns([1, 9])
+        if col1.button("➕", key="add_") and st.session_state.user:
             db.add_answers(st.session_state.curr_system)
             st.rerun()
-        if openings and col2.button("❌", key="del_"):
+        if openings and col2.button("❌", key="del_") and st.session_state.user:
             st.session_state.delete_bid = openings[-1].full_seq
 
     #  Create new System
@@ -73,7 +85,7 @@ def main():
             col1, col2 = st.columns([1, 9])
             if col1.form_submit_button("Save"):
                 if name:
-                    if db.create_system(name, title, description, version):
+                    if db.create_system(name, title, description, version, st.session_state.user):
                         st.session_state.curr_system = name
                         st.session_state.edit_system = None
                         st.rerun()
@@ -92,11 +104,11 @@ def main():
             st.subheader(f"Edit System '{st.session_state.curr_system}'")
             with st.form("edit_system_form", enter_to_submit=False):
                 title = st.text_input("Title", sys_info["title"], key="new_title")
-                description = st.text_area("Description", sys_info["description"], key="new_descr")
                 version = st.text_input("Version", sys_info["version"], key="new_ver")
+                description = st.text_area("Description", sys_info["description"], height="content", key="new_descr")
                 col1, col2 = st.columns([1, 9])
                 if col1.form_submit_button("Save"):
-                    if db.update_system(st.session_state.curr_system, title, description, version):
+                    if db.update_system(st.session_state.curr_system, repl_str(title), repl_str(description), version):
                         st.session_state.edit_system = None
                         st.rerun()
                     else:

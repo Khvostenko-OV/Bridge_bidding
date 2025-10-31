@@ -1,3 +1,4 @@
+import hashlib
 import sqlite3
 
 from config import DB_NAME
@@ -16,26 +17,89 @@ def init(db_name=DB_NAME) -> None:
             version TEXT DEFAULT ""
         );
     """)
-#    cursor.execute(f"DROP TABLE IF EXISTS F1;")
+    cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+            login TEXT UNIQUE,
+            username TEXT,
+            password TEXT,
+            is_admin BOOLEAN DEFAULT FALSE,
+            system TEXT DEFAULT ""
+        );
+    """)
+    # cursor.execute("""
+    #                INSERT INTO users (login, username, password, is_admin)
+    #                VALUES (?, ?, ?, ?);""",
     conn.commit()
     cursor.close()
     conn.close()
 
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+def verify_password(password: str, stored_hash: str) -> bool:
+    return hash_password(password) == stored_hash
+
+def auth(login: str, psw: str, db_name=DB_NAME) -> dict:
+    try:
+        conn = sqlite3.connect(db_name)
+        cursor = conn.cursor()
+        cursor.execute(f"""
+            SELECT * FROM users WHERE login = "{login}";
+        """)
+        res = cursor.fetchone()
+        cursor.close()
+        conn.close()
+    except Exception as err:
+        print(f"Error. Can't auth: {err}")
+        return {"Error": f"{err}"}
+    if res is None:
+        return {"Error": f"User **{login}** not found!"}
+    if verify_password(psw, res[2]):
+        return {
+            "login": res[0],
+            "username": res[1],
+            "is_admin": res[3],
+            "system": res[4],
+        }
+    else:
+        return {"Error": f"Wrong pair login/password!"}
+
+def change_user(login: str, system="", db_name=DB_NAME) -> bool:
+    try:
+        conn = sqlite3.connect(db_name)
+        cursor = conn.cursor()
+        cursor.execute(f"""
+            UPDATE users 
+            SET system="{system}"  
+            WHERE login="{login}";
+        """)
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as err:
+        print(f"Error. Can't change user {login}: {err}")
+        return False
+    return True
+
 def systems(db_name=DB_NAME) -> list[str]:
     """List of bidding systems"""
-    conn = sqlite3.connect(db_name)
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT name
-        FROM all_systems
-        ORDER BY name;
-    """)
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
+    try:
+        conn = sqlite3.connect(db_name)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT name
+            FROM all_systems
+            ORDER BY name;
+        """)
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+    except Exception as err:
+        print(f"Error. Can't fetch systems: {err}")
+        return []
     return [row[0] for row in rows]
 
-def create_system(name: str, title="", descr="", ver="", db_name=DB_NAME) -> bool:
+def create_system(name: str, title="", descr="", ver="", author="", db_name=DB_NAME) -> bool:
     """Create new bidding system"""
     if not name or name in systems(db_name): return False
     try:
@@ -52,8 +116,10 @@ def create_system(name: str, title="", descr="", ver="", db_name=DB_NAME) -> boo
                 suits TEXT DEFAULT ""
             );
         """)
-        sql = "INSERT INTO all_systems (name, title, description, version) VALUES (?, ?, ?, ?);"
-        cursor.execute(sql, (name, title, descr, ver))
+        cursor.execute("""
+            INSERT INTO all_systems (name, title, description, version, owner) 
+            VALUES (?, ?, ?, ?);""",
+            (name, title, descr, ver, author))
         for bid in range(6):
             cursor.execute(f'INSERT INTO "{name}" (bid) VALUES ({bid});')
         conn.commit()
@@ -70,8 +136,10 @@ def update_system(name: str, title="", descr="", ver="", db_name=DB_NAME) -> boo
     try:
         conn = sqlite3.connect(db_name)
         cursor = conn.cursor()
-        sql = "UPDATE all_systems SET title=?, description=?, version=? WHERE name=?;"
-        cursor.execute(sql, (title, descr, ver, name))
+        cursor.execute("""
+            UPDATE all_systems SET title=?, description=?, version=? 
+            WHERE name=?;""",
+            (title, descr, ver, name))
         conn.commit()
         cursor.close()
         conn.close()
@@ -83,22 +151,32 @@ def update_system(name: str, title="", descr="", ver="", db_name=DB_NAME) -> boo
 def get_system(name: str, db_name=DB_NAME) -> dict | None:
     """Get system info"""
     if not name: return None
-    conn = sqlite3.connect(db_name)
-    cursor = conn.cursor()
-    conn = sqlite3.connect(db_name)
-    cursor = conn.cursor()
-    cursor.execute(f"""
-        SELECT * FROM all_systems WHERE name = "{name}";
-    """)
-    res = cursor.fetchone()
-    cursor.close()
-    conn.close()
+    try:
+        conn = sqlite3.connect(db_name)
+        cursor = conn.cursor()
+        cursor.execute(f"""
+            SELECT * FROM all_systems WHERE name = "{name}";
+        """)
+        res = cursor.fetchone()
+        if not res is None and res[4]:
+            cursor.execute(f"""SELECT username FROM users WHERE login = "{res[4]}";""")
+            user = cursor.fetchone()
+            username = user[0] if user else ""
+        else:
+            username = ""
+        cursor.close()
+        conn.close()
+    except Exception as err:
+        print(f"Error. Can't fetch system '{name}': {err}")
+        return None
     if res is None: return None
     return {
         "name": res[0],
         "title": res[1],
         "description": res[2],
         "version": res[3],
+        "owner": res[4],
+        "owner_name": username,
     }
 
 def delete_system(name: str, db_name=DB_NAME) -> bool:
@@ -117,7 +195,7 @@ def delete_system(name: str, db_name=DB_NAME) -> bool:
         return False
     return True
 
-def clone_system(name: str, new_name: str, db_name=DB_NAME) -> bool:
+def clone_system(name: str, new_name: str, author="", db_name=DB_NAME) -> bool:
     """Clone system"""
     if not name or not new_name: return False
     sys_info = get_system(name, db_name)
@@ -127,9 +205,9 @@ def clone_system(name: str, new_name: str, db_name=DB_NAME) -> bool:
         cursor = conn.cursor()
         cursor.execute(f"CREATE TABLE {new_name} AS SELECT * FROM {name};")
         cursor.execute("""
-            INSERT INTO all_systems (name, title, description, version) 
-            VALUES (?, ?, ?, ?);""",
-            (new_name, sys_info["title"] + " *(copy)*", sys_info["description"], sys_info["version"]))
+            INSERT INTO all_systems (name, title, description, version, owner) 
+            VALUES (?, ?, ?, ?, ?);""",
+    (new_name, sys_info["title"] + " *(copy)*", sys_info["description"], sys_info["version"], author))
         conn.commit()
         cursor.close()
         conn.close()

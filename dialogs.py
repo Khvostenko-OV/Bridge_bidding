@@ -2,6 +2,24 @@ from config import st
 import db
 from utils import repl_str
 
+@st.dialog("Welcome", dismissible=False)
+def login_dialog():
+    login = st.text_input("Login", key="login")
+    password = st.text_input("Password", type="password", key="password")
+    col_yes, col_no = st.columns([1, 3])
+    if col_yes.button("Enter") and login and password:
+        log = db.auth(login, password)
+        if "Error" in log:
+            st.error(log["Error"])
+        else:
+            st.session_state.user = login
+            st.session_state.curr_system = log["system"]
+            st.session_state.show_login = False
+            st.rerun()
+    if col_no.button("Read only"):
+        st.session_state.show_login = False
+        st.rerun()
+
 @st.dialog("Confirm Deletion", dismissible=False)
 def delete_system_dialog(sys_name: str):
     if not sys_name: return
@@ -27,7 +45,7 @@ def clone_system_dialog(sys_name: str):
         new_name = ""
     col_yes, col_no = st.columns(2)
     if col_yes.button("✅ Yes") and new_name:
-        if db.clone_system(sys_name, new_name):
+        if db.clone_system(sys_name, new_name, st.session_state.user):
             st.session_state.curr_system = new_name
         st.session_state.edit_system = None
         st.rerun()

@@ -50,6 +50,10 @@ class Bid:
         return f"**{self.seq_str} :** {self.description}"
 
     @property
+    def to_markdown(self) -> str:
+        return f":blue-background[{self.seq_str} ] {self.description}"
+
+    @property
     def full_seq(self) -> str:
         if self.seq:
             return f"{self.seq}.{self.bid}"
