@@ -4,20 +4,53 @@ from utils import repl_str
 
 @st.dialog("Welcome", dismissible=False)
 def login_dialog():
-    login = st.text_input("Login", key="login")
-    password = st.text_input("Password", type="password", key="password")
-    col_yes, col_no = st.columns([1, 3])
-    if col_yes.button("Enter") and login and password:
+    login = st.text_input("Login", key="lgn")
+    password = st.text_input("Password", type="password", key="psw")
+    col1, col2, col3 = st.columns([1, 1, 2])
+    if col1.button("Enter") and login and password:
         log = db.auth(login, password)
         if "Error" in log:
             st.error(log["Error"])
         else:
             st.session_state.user = login
+            st.session_state.username = log["username"]
             st.session_state.curr_system = log["system"]
-            st.session_state.show_login = False
+            st.session_state.show_login = ""
             st.rerun()
-    if col_no.button("Read only"):
-        st.session_state.show_login = False
+    if col2.button("Register"):
+        st.session_state.show_login = "signup"
+        st.rerun()
+    if col3.button("Read only"):
+        st.session_state.user = ""
+        st.session_state.username = ""
+        st.session_state.curr_system = ""
+        st.session_state.show_login = ""
+        st.rerun()
+
+@st.dialog("New user", dismissible=False)
+def register_dialog():
+    login = st.text_input("Login", key="lgn")
+    password = st.text_input("Password", type="password", key="psw")
+    username = st.text_input("Username", key="usrnm")
+    col1, col2, col3 = st.columns([1, 1, 2])
+    if col1.button("Create") and login and password:
+        err = db.add_user(login, password, username)
+        if err:
+            st.error(err)
+        else:
+            st.session_state.user = login
+            st.session_state.username = username
+            st.session_state.curr_system = ""
+            st.session_state.show_login = ""
+            st.rerun()
+    if col2.button("Login"):
+        st.session_state.show_login = "login"
+        st.rerun()
+    if col3.button("Read only"):
+        st.session_state.user = ""
+        st.session_state.username = ""
+        st.session_state.curr_system = ""
+        st.session_state.show_login = ""
         st.rerun()
 
 @st.dialog("Confirm Deletion", dismissible=False)

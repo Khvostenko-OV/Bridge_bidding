@@ -26,9 +26,6 @@ def init(db_name=DB_NAME) -> None:
             system TEXT DEFAULT ""
         );
     """)
-    # cursor.execute("""
-    #                INSERT INTO users (login, username, password, is_admin)
-    #                VALUES (?, ?, ?, ?);""",
     conn.commit()
     cursor.close()
     conn.close()
@@ -64,7 +61,26 @@ def auth(login: str, psw: str, db_name=DB_NAME) -> dict:
     else:
         return {"Error": f"Wrong pair login/password!"}
 
-def change_user(login: str, system="", db_name=DB_NAME) -> bool:
+def add_user(login: str, psw: str, username="", is_admin=False, db_name=DB_NAME) -> str:
+    try:
+        conn = sqlite3.connect(db_name)
+        cursor = conn.cursor()
+        cursor.execute("""
+                       INSERT INTO users (login, username, password, is_admin)
+                       VALUES (?, ?, ?, ?);""",
+                       (login, username, hash_password(psw), is_admin))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        err = str(e)
+        print(f"Error. Can't create user {login}: {err}")
+        if "UNIQUE" in err:
+            return f"User **{login}** already exists!"
+        return err
+    return ""
+
+def change_user(login: str, system="", username=None, db_name=DB_NAME) -> bool:
     try:
         conn = sqlite3.connect(db_name)
         cursor = conn.cursor()
@@ -256,9 +272,9 @@ def fetch_answers(system_name: str, seq: str ="", db_name=DB_NAME) -> list[Bid] 
     if rows is None: return []
     return [Bid(*row) for row in rows]
 
-def build_tree(system_name: str, seq: str="", db_name=DB_NAME) -> list[Bid] | None:
+def build_tree(system_name: str, seq: str="", db_name=DB_NAME) -> list[Bid]:
     """Returns full tree of answers to sequence seq"""
-    if not system_name: return None
+    if not system_name: return []
     tree = fetch_answers(system_name, seq, db_name)
     for bid in tree:
         bid.children = build_tree(system_name, bid.full_seq + ".0", db_name)
