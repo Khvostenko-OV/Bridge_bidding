@@ -6,19 +6,19 @@ from models import Bid
 from utils import repl_str
 
 
-def display_bid(bid: Bid, can_edit=False):
+def display_bid(bid: Bid, opps=False, can_edit=False):
     if can_edit:
         col1, col2 = st.columns([19, 1])
     else:
         col1 = st.columns(1)[0]
         col2 = None
-    with col1.expander(bid.to_markdown, False, ):
+    with col1.expander(bid.to_markdown(opps), False, ):
         for next_bid in bid.children:
-            display_bid(next_bid, can_edit)
+            display_bid(next_bid, opps, can_edit)
         if can_edit:
             col3, col4 = st.columns([1, 9])
             if col3.button("➕", key=f"add_{bid.full_seq}"):
-                db.add_answers(st.session_state.curr_system, bid.full_seq)
+                db.add_answer(st.session_state.curr_system, bid.full_seq, opps)
                 st.rerun()
             if bid.children and col4.button("❌", key=f"del_{bid.full_seq}"):
                 st.session_state.delete_bid = bid.children[-1].full_seq
@@ -31,6 +31,8 @@ def main():
         st.session_state.user = ""
     if "username" not in st.session_state:
         st.session_state.username = ""
+    if "opps" not in st.session_state:
+        st.session_state.opps = False
     if "show_login" not in st.session_state:
         st.session_state.show_login = "login"
     if "edit_system" not in st.session_state:
@@ -62,6 +64,9 @@ def main():
     if st.session_state.show_login == "signup":
         register_dialog()
 
+    opps = st.sidebar.toggle("With opps", value=st.session_state.opps, key="opps_switch")
+    st.session_state.opps = opps
+
     if st.session_state.user and st.sidebar.button("Add System"):
         st.session_state.edit_system = "add"
 
@@ -91,13 +96,13 @@ def main():
             if can_edit and col2.button("✏️", key="edit_system_button", help=f"Edit System description") and st.session_state.user:
                 st.session_state.edit_system = "edit"
                 st.rerun()
-            openings = db.build_tree(st.session_state.curr_system)
+            openings = db.build_tree(st.session_state.curr_system, "", st.session_state.opps)
             for bid in openings:
-                display_bid(bid, can_edit)
+                display_bid(bid, st.session_state.opps, can_edit)
             if can_edit:
                 col1, col2 = st.columns([1, 9])
                 if col1.button("➕", key="add_"):
-                    db.add_answers(st.session_state.curr_system)
+                    db.add_answer(st.session_state.curr_system)
                     st.rerun()
                 if openings and col2.button("❌", key="del_"):
                     st.session_state.delete_bid = openings[-1].full_seq

@@ -3,7 +3,7 @@ import sqlite3
 
 from config import DB_NAME
 from models import Bid
-from utils import decomp_seq
+from utils import decomp_seq, can_contra, can_recontra, seq2list, can_pass, list2seq
 
 
 def init(db_name=DB_NAME) -> None:
@@ -129,12 +129,12 @@ def create_system(name: str, title="", descr="", ver="", author="", db_name=DB_N
                 pc_min INTEGER DEFAULT 0,
                 pc_max INTEGER DEFAULT 37,
                 balanced BOOLEAN DEFAULT FALSE,
-                suits TEXT DEFAULT ""
+                suits TEXT DEFAULT ",,,"
             );
         """)
         cursor.execute("""
             INSERT INTO all_systems (name, title, description, version, owner) 
-            VALUES (?, ?, ?, ?);""",
+            VALUES (?, ?, ?, ?, ?);""",
             (name, title, descr, ver, author))
         for bid in range(6):
             cursor.execute(f'INSERT INTO "{name}" (bid) VALUES ({bid});')
@@ -270,14 +270,22 @@ def fetch_answers(system_name: str, seq: str ="", db_name=DB_NAME) -> list[Bid] 
         print(f"Error. Can't fetch system '{system_name}': {err}")
         return []
     if rows is None: return []
-    return [Bid(*row) for row in rows]
+    bids = [Bid(*row) for row in rows]
+    if len(bids) > 1 and bids[0].bid < 0 and bids[1].bid == 0:
+        bid = bids.pop(0)
+        bids.insert(1, bid)
+    return bids
 
-def build_tree(system_name: str, seq: str="", db_name=DB_NAME) -> list[Bid]:
+def build_tree(system_name: str, seq: str="", opps=False, db_name=DB_NAME) -> list[Bid]:
     """Returns full tree of answers to sequence seq"""
     if not system_name: return []
+    dop = "" if opps else ".0"
     tree = fetch_answers(system_name, seq, db_name)
+    if not opps and seq:
+        while tree and tree[0].bid <= 0:
+            tree.pop(0)
     for bid in tree:
-        bid.children = build_tree(system_name, bid.full_seq + ".0", db_name)
+        bid.children = build_tree(system_name, bid.full_seq + dop, opps, db_name)
     return tree
 
 def update_bid(system_name: str, bid: Bid, db_name=DB_NAME) -> bool:
@@ -309,22 +317,48 @@ def update_bid(system_name: str, bid: Bid, db_name=DB_NAME) -> bool:
         return False
     return True
 
-def add_answers(system_name: str, seq: str="", number=1, db_name=DB_NAME) -> bool:
+def next_answer(system_name: str, seq: str="", opps=False, db_name=DB_NAME) -> int:
+    """Next answer"""
+    if not system_name: return 0
+#    print("Seq: ", seq)
+    bids = [b.bid for b in fetch_answers(system_name, seq if opps else seq + ".0", db_name)]
+#    print("Answers: ", bids)
+    if bids:
+        if opps:
+            if not (0 in bids) and can_pass(seq): return 0
+            if not (-1 in bids) and can_contra(seq): return -1
+            if not (-2 in bids) and can_recontra(seq): return -2
+        if bids[-1] > 0: return bids[-1] + 1
+    else:
+        if not seq: return 0
+        if fetch_bid(system_name, seq, db_name) is None: return -3
+        if opps:
+            if can_pass(seq): return 0
+            if can_contra(seq): return -1
+            if can_recontra(seq): return -2
+    return max(seq2list(seq)) + 1
+
+
+def add_answer(system_name: str, seq: str="", opps=False, db_name=DB_NAME) -> bool:
     """Add number next answers to sequence seq"""
     if not system_name: return False
-    if seq:
-        bid = fetch_bid(system_name, seq, db_name)
-        if bid is None: return False
-        new_seq = seq + ".0"
-        start = bid.bid + 1
+    nxt = next_answer(system_name, seq, opps, db_name)
+    # print("Next answer: ", nxt)
+    if nxt < -2: return False
+    bids = seq2list(seq)
+    bid = None
+    back = 2 + opps
+    if len(bids) > back:
+        bid = fetch_bid(system_name, list2seq(bids[:-back]), db_name)
+    if bid is not None:
+        bid.bid = nxt
+        bid.seq = seq
+        bid.description = ""
     else:
-        new_seq = ""
-        start = 0
-    answers = fetch_answers(system_name, new_seq, db_name)
-    if answers:
-        start = answers[-1].bid + 1
-    res = [update_bid(system_name, Bid(start + i, new_seq), db_name) for i in range(number)]
-    return all(res)
+        bid = Bid(nxt, seq)
+    if not opps:
+        bid.seq += ".0"
+    return update_bid(system_name, bid, db_name)
 
 def del_thread(system_name: str, seq: str, db_name=DB_NAME) -> int:
     """Delete sequence seq with all answers"""

@@ -11,7 +11,7 @@ class Bid:
                  pc_min: int =0,
                  pc_max: int =37,
                  balanced: bool =False,
-                 suits: str =""
+                 suits: str =",,,"
                 ):
         self.bid = bid
         self.seq = seq
@@ -50,10 +50,6 @@ class Bid:
         return f"**{self.seq_str} :** {self.description}"
 
     @property
-    def to_markdown(self) -> str:
-        return f":blue-background[{self.seq_str} ] {self.description}"
-
-    @property
     def full_seq(self) -> str:
         if self.seq:
             return f"{self.seq}.{self.bid}"
@@ -62,7 +58,17 @@ class Bid:
 
     @property
     def seq_str(self) -> str:
-        if self.full_seq == "0": return "pass"
+        #if self.full_seq == "0": return "pass"
         bids = self.full_seq.split(".")
-        res = " ".join(["-" if bid == "0" else repr_bid(int(bid)) for bid in bids])
+        res = " ".join([repr_bid(bid) for bid in bids])
         return res.replace("-", "pass", 1) if res.startswith("-") else res
+
+    def to_markdown(self, opps=False) -> str:
+        if opps:
+            bids = self.full_seq.split(".")
+            res = ""
+            for i, bid in enumerate(bids):
+                res += f":red-background[{repr_bid(bid)} ]" if i%2 else f":blue-background[{repr_bid(bid)} ]"
+        else:
+            res = f":blue-background[{self.seq_str} ]"
+        return f"{res} {self.description}"

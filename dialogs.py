@@ -92,11 +92,25 @@ def edit_bid_dialog(sys_name: str, seq: str):
     if not sys_name: return
     bid = db.fetch_bid(sys_name, seq)
     if not bid: return
+    suits = bid.suits.split(",")
+    if suits == [""]:
+        suits = suits * 4
     st.subheader(bid.seq_str)
-    desc = st.text_input("Description", value=bid.description, key="bid_description")
+    bid.description = st.text_input("Description", value=bid.description, key="bid_description")
+    col1, col2, col3 = st.columns(3)
+    bid.pc_min = col1.number_input("Min PC", value=bid.pc_min, min_value=0, max_value=37, key="min_pc")
+    bid.pc_max = col2.number_input("Max PC", value=bid.pc_max, min_value=0, max_value=37, key="max_pc")
+    bid.balanced = col3.checkbox("Balanced", value=bid.balanced, key="balanced")
+    col_11, col_21, col_31, col_41 = st.columns(4)
+    suits[0] = col_11.text_input("♣️", value=suits[0], key="c_min")
+    suits[1] = col_21.text_input("♦️", value=suits[1], key="d_min")
+    suits[2] = col_31.text_input("♥️", value=suits[2], key="h_min")
+    suits[3] = col_41.text_input("♠️", value=suits[3], key="s_min")
+    
     col_save, col_no = st.columns(2)
     if col_save.button("✅ Save"):
-        bid.description = repl_str(desc)
+        bid.description = repl_str(bid.description)
+        bid.suits = ",".join(suits)
         db.update_bid(sys_name, bid)
         st.session_state.edit_bid = None
         st.rerun()
