@@ -45,6 +45,7 @@ def main():
         st.session_state.curr_system = ""
         st.session_state.user = ""
         st.session_state.username = ""
+        st.session_state.opps = False
         st.session_state.show_login = "login"
         st.rerun()
 
@@ -64,8 +65,7 @@ def main():
     if st.session_state.show_login == "signup":
         register_dialog()
 
-    opps = st.sidebar.toggle("With opps", value=st.session_state.opps, key="opps_switch")
-    st.session_state.opps = opps
+    st.session_state.opps = st.sidebar.toggle("With opps", value=st.session_state.opps, key="opps_switch")
 
     if st.session_state.user and st.sidebar.button("Add System"):
         st.session_state.edit_system = "add"
