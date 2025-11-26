@@ -320,15 +320,15 @@ def update_bid(system_name: str, bid: Bid, db_name=DB_NAME) -> bool:
 def next_answer(system_name: str, seq: str="", opps=False, db_name=DB_NAME) -> int:
     """Next answer"""
     if not system_name: return 0
-#    print("Seq: ", seq)
-    bids = [b.bid for b in fetch_answers(system_name, seq if opps else seq + ".0", db_name)]
-#    print("Answers: ", bids)
+    print("Seq: ", seq)
+    bids = [b.bid for b in fetch_answers(system_name, seq if opps or not seq else seq + ".0", db_name)]
+    print("Answers: ", bids)
     if bids:
         if opps:
             if not (0 in bids) and can_pass(seq): return 0
             if not (-1 in bids) and can_contra(seq): return -1
             if not (-2 in bids) and can_recontra(seq): return -2
-        if bids[-1] > 0: return bids[-1] + 1
+        if bids[-1] >= 0: return bids[-1] + 1
     else:
         if not seq: return 0
         if fetch_bid(system_name, seq, db_name) is None: return -3
@@ -356,7 +356,7 @@ def add_answer(system_name: str, seq: str="", opps=False, db_name=DB_NAME) -> bo
         bid.description = ""
     else:
         bid = Bid(nxt, seq)
-    if not opps:
+    if not opps and seq:
         bid.seq += ".0"
     return update_bid(system_name, bid, db_name)
 
