@@ -320,9 +320,7 @@ def update_bid(system_name: str, bid: Bid, db_name=DB_NAME) -> bool:
 def next_answer(system_name: str, seq: str="", opps=False, db_name=DB_NAME) -> int:
     """Next answer"""
     if not system_name: return 0
-    print("Seq: ", seq)
     bids = [b.bid for b in fetch_answers(system_name, seq if opps or not seq else seq + ".0", db_name)]
-    print("Answers: ", bids)
     if bids:
         if opps:
             if not (0 in bids) and can_pass(seq): return 0
@@ -343,7 +341,6 @@ def add_answer(system_name: str, seq: str="", opps=False, db_name=DB_NAME) -> bo
     """Add number next answers to sequence seq"""
     if not system_name: return False
     nxt = next_answer(system_name, seq, opps, db_name)
-    # print("Next answer: ", nxt)
     if nxt < -2: return False
     bids = seq2list(seq)
     bid = None
