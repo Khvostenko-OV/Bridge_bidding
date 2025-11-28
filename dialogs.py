@@ -106,12 +106,12 @@ def edit_bid_dialog(sys_name: str, seq: str):
     suits[1] = col_21.text_input("♦️", value=suits[1], key="d_min")
     suits[2] = col_31.text_input("♥️", value=suits[2], key="h_min")
     suits[3] = col_41.text_input("♠️", value=suits[3], key="s_min")
-    
+
     col_save, col_no = st.columns(2)
     if col_save.button("✅ Save"):
         bid.description = repl_str(bid.description)
         bid.suits = ",".join(suits)
-        db.update_bid(sys_name, bid)
+        db.upsert_bid(sys_name, bid)
         st.session_state.edit_bid = None
         st.rerun()
     if col_no.button("❌ Cancel"):
