@@ -1,5 +1,5 @@
 from bidding import get_answers, add_answer
-from config import st
+from config import st, DB_DSN
 import db
 from dialogs import login_dialog, register_dialog
 from dialogs import edit_bid_dialog, delete_system_dialog, delete_bid_dialog, clone_system_dialog
@@ -77,6 +77,7 @@ def main():
 
     if st.session_state.sys_info is None:
         st.header("Bridge bidding")
+        st.write(DB_DSN)
         if st.session_state.curr_system:
             st.warning(f"Can't read System {st.session_state.curr_system}")
     else:
