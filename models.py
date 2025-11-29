@@ -1,6 +1,6 @@
 import json
 
-from utils import repr_bid
+from utils import repr_bid, can_pass, can_contra, can_recontra
 
 
 class Bid:
@@ -20,7 +20,7 @@ class Bid:
         self.pc_max = pc_max
         self.balanced = balanced
         self.suits = suits
-        self.children = []
+        # self.children = []
 
     def __str__(self):
         return repr_bid(self.bid)
@@ -63,6 +63,10 @@ class Bid:
         res = " ".join([repr_bid(bid) for bid in bids])
         return res.replace("-", "pass", 1) if res.startswith("-") else res
 
+    @property
+    def seq_list(self) -> list[int]:
+        return [ int(b) for b in self.full_seq.split(".")]
+
     def to_markdown(self, opps=False) -> str:
         if opps:
             bids = self.full_seq.split(".")
@@ -72,3 +76,11 @@ class Bid:
         else:
             res = f":blue-background[{self.seq_str} ]"
         return f"{res} {self.description}"
+
+    def next_bid(self, opps=False) -> int:
+        if opps:
+            if can_pass(self.full_seq): return 0
+            if can_contra(self.full_seq): return -1
+            if can_recontra(self.full_seq): return -2
+        if self.bid > 0: return self.bid + 1
+        return max(self.seq_list) + 1

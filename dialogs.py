@@ -1,6 +1,8 @@
 from config import st
 import db
+from models import Bid
 from utils import repl_str
+
 
 @st.dialog("Welcome", dismissible=False)
 def login_dialog():
@@ -15,6 +17,9 @@ def login_dialog():
             st.session_state.user = login
             st.session_state.username = log["username"]
             st.session_state.curr_system = log["system"]
+            st.session_state.systems = db.systems()
+            st.session_state.sys_info = db.get_system_info(st.session_state.curr_system)
+            st.session_state.bids = db.get_bids(st.session_state.curr_system)
             st.session_state.show_login = ""
             st.rerun()
     if col2.button("Register"):
@@ -24,6 +29,7 @@ def login_dialog():
         st.session_state.user = ""
         st.session_state.username = ""
         st.session_state.curr_system = ""
+        st.session_state.systems = db.systems()
         st.session_state.show_login = ""
         st.rerun()
 
@@ -41,6 +47,7 @@ def register_dialog():
             st.session_state.user = login
             st.session_state.username = username
             st.session_state.curr_system = ""
+            st.session_state.systems = db.systems()
             st.session_state.show_login = ""
             st.rerun()
     if col2.button("Login"):
@@ -50,18 +57,21 @@ def register_dialog():
         st.session_state.user = ""
         st.session_state.username = ""
         st.session_state.curr_system = ""
+        st.session_state.systems = db.systems()
         st.session_state.show_login = ""
         st.rerun()
 
 @st.dialog("Confirm Deletion", dismissible=False)
-def delete_system_dialog(sys_name: str):
-    if not sys_name: return
-    st.warning(f"Are you sure you want to delete System '**{sys_name}**'?")
+def delete_system_dialog():
+    if not st.session_state.curr_system: return
+    st.warning(f"Are you sure you want to delete System '**{st.session_state.curr_system}**'?")
     col_yes, col_no = st.columns(2)
     if col_yes.button("✅ Yes 🗑"):
-        db.delete_system(sys_name)
-        if st.session_state.curr_system == sys_name:
+        if db.delete_system(st.session_state.curr_system):
             st.session_state.curr_system = ""
+            st.session_state.bids = []
+            st.session_state.sys_info = None
+        st.session_state.systems = db.systems()
         st.session_state.edit_system = None
         st.rerun()
     if col_no.button("❌ Cancel"):
@@ -69,17 +79,20 @@ def delete_system_dialog(sys_name: str):
         st.rerun()
 
 @st.dialog("Clone system", dismissible=False)
-def clone_system_dialog(sys_name: str):
-    if not sys_name: return
-    st.subheader(f"Create a copy of '**{sys_name}**'")
+def clone_system_dialog():
+    if not st.session_state.curr_system: return
+    st.subheader(f"Create a copy of '**{st.session_state.curr_system}**'")
     new_name = st.text_input("New short name", key="new_name")
-    if new_name in db.systems():
+    st.session_state.systems = db.systems()
+    if new_name in st.session_state.systems:
         st.error("This name is already in use!")
         new_name = ""
     col_yes, col_no = st.columns(2)
     if col_yes.button("✅ Yes") and new_name:
-        if db.clone_system(sys_name, new_name, st.session_state.user):
+        if db.clone_system(st.session_state.curr_system, new_name, st.session_state.user):
             st.session_state.curr_system = new_name
+            st.session_state.systems = db.systems()
+            st.session_state.sys_info = db.get_system_info(st.session_state.curr_system)
         st.session_state.edit_system = None
         st.rerun()
     if col_no.button("❌ Cancel"):
@@ -88,13 +101,11 @@ def clone_system_dialog(sys_name: str):
 
 
 @st.dialog("Edit bid", width="medium", dismissible=False)
-def edit_bid_dialog(sys_name: str, seq: str):
-    if not sys_name: return
-    bid = db.fetch_bid(sys_name, seq)
-    if not bid: return
+def edit_bid_dialog():
+    if not st.session_state.curr_system: return
+    bid = Bid(**st.session_state.edit_bid.to_dict)
     suits = bid.suits.split(",")
-    if suits == [""]:
-        suits = suits * 4
+    suits = suits * 4 if suits == [""] else suits
     st.subheader(bid.seq_str)
     bid.description = st.text_input("Description", value=bid.description, key="bid_description")
     col1, col2, col3 = st.columns(3)
@@ -111,7 +122,12 @@ def edit_bid_dialog(sys_name: str, seq: str):
     if col_save.button("✅ Save"):
         bid.description = repl_str(bid.description)
         bid.suits = ",".join(suits)
-        db.upsert_bid(sys_name, bid)
+        if db.upsert_bid(st.session_state.curr_system, bid):
+            st.session_state.edit_bid.description = bid.description
+            st.session_state.edit_bid.pc_min = bid.pc_min
+            st.session_state.edit_bid.pc_max = bid.pc_max
+            st.session_state.edit_bid.balanced = bid.balanced
+            st.session_state.edit_bid.suits = bid.suits
         st.session_state.edit_bid = None
         st.rerun()
     if col_no.button("❌ Cancel"):
@@ -119,14 +135,15 @@ def edit_bid_dialog(sys_name: str, seq: str):
         st.rerun()
 
 @st.dialog("Confirm Deletion", dismissible=False)
-def delete_bid_dialog(sys_name: str, seq: str):
-    if not sys_name: return
-    bid = db.fetch_bid(sys_name, seq)
-    if not bid: return
-    st.warning(f"Are you sure you want to delete thread **{bid.seq_str}** ?")
+def delete_bid_dialog():
+    if not st.session_state.curr_system: return
+    st.warning(f"Are you sure you want to delete thread **{st.session_state.delete_bid.seq_str}** ?")
     col_yes, col_no = st.columns(2)
     if col_yes.button("✅ Yes 🗑"):
-        db.del_thread(sys_name, bid.full_seq)
+        if db.del_thread(st.session_state.curr_system, st.session_state.delete_bid):
+            st.session_state.bids.remove(st.session_state.delete_bid)
+            st.session_state.bids = [b for b in st.session_state.bids
+                                     if not b.seq.startswith(st.session_state.delete_bid.full_seq)]
         st.session_state.delete_bid = None
         st.rerun()
     if col_no.button("❌ Cancel"):

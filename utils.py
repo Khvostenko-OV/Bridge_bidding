@@ -6,9 +6,11 @@ SA = "NT"
 SUITS = ["NT", "♣️", "♦️", "♥️", "♠️"]
 REPLACE = {
     "_c": TREFF,
+    "_t": TREFF,
     "_d": CARO,
     "_h": COEUR,
     "_s": PIK,
+    "_p": PIK,
     "_т": TREFF,
     "_б": CARO,
     "_ч": COEUR,
@@ -32,8 +34,7 @@ def decomp_seq(full_seq: str):
     return seq, int(bid)
 
 def seq2list(seq: str) ->list[int]:
-    if not seq: return []
-    return [int(b) for b in seq.split(".")]
+    return [int(b) for b in seq.split(".")] if seq else []
 
 def list2seq(lst: list[int]) -> str:
     return ".".join([str(n) for n in lst])
