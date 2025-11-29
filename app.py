@@ -173,5 +173,5 @@ def main():
         delete_bid_dialog()
 
 if __name__ == "__main__":
-    db.init()
+    # db.init()
     main()
