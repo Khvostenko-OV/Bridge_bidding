@@ -1,3 +1,5 @@
+import csv
+
 from config import st
 import db
 from models import Bid
@@ -49,4 +51,62 @@ def add_answer(bid: Bid = None) -> bool:
     if db.upsert_bid(st.session_state.curr_system, new_bid):
         st.session_state.bids.append(new_bid)
         return True
+    else:
+        st.session_state.message = {"type": "E", "message": f"Fail to create bid {new_bid.seq_str}"}
     return False
+
+def save_system() -> bool:
+    """Save system to .csv file"""
+    if not st.session_state.curr_system: return False
+    try:
+        with open(f"{st.session_state.curr_system}.csv", "w", encoding="utf-8") as f:
+            f.write(st.session_state.sys_info["title"] + "\n")
+            f.write(st.session_state.sys_info["description"] + "\n")
+            f.write("~~~~~~\n")
+            for b in st.session_state.bids:
+                b.suits = b.suits.strip() if b.suits else ",,,"
+                f.write(f'{b.bid},{b.seq},"{b.description}",{b.pc_min},{b.pc_max},{b.balanced},"{b.suits}"\n')
+    except Exception as err:
+        print(f"Error. Can't save System '{st.session_state.curr_system}': {err}")
+        st.session_state.message = {"type": "E", "message": f"Fail to save System **{st.session_state.curr_system}**: {err}"}
+        return False
+    st.session_state.message = {"type": "S", "message": f"System **{st.session_state.curr_system}** saved"}
+    return True
+
+def load_system(filename):
+    """Load system from .csv file"""
+    try:
+        sys_name = filename.split(".")[0]
+        if sys_name in st.session_state.systems: raise Exception(f"System '{sys_name}' already exists")
+        if not db.create_system(sys_name, author=st.session_state.user): raise Exception(f"Can't create System '{sys_name}'")
+        with open(filename, "r", encoding="utf-8") as f:
+            title = f.readline().strip()
+            s = f.readline().strip()
+            lines =[]
+            while s != "~~~~~~":
+                lines.append(s)
+                s = f.readline().strip()
+            description = "\n".join(lines)
+            db.update_system(sys_name, title, description)
+            reader = csv.reader(f)
+            for line in reader:
+                db.upsert_bid(sys_name, Bid(int(line[0]),
+                                            line[1],
+                                            line[2].strip('"'),
+                                            int(line[3]),
+                                            int(line[4]),
+                                            line[5] == "True",
+                                            line[6].strip('"')
+                                            ))
+    except Exception as err:
+        print(f"Error. Can't load System '{st.session_state.curr_system}': {err}")
+        st.session_state.message = {"type": "E", "message": f"Fail to load System from **{filename}**: {err}"}
+        st.session_state.systems = db.systems()
+        return False
+
+    st.session_state.curr_system = sys_name
+    st.session_state.sys_info = db.get_system_info(sys_name)
+    st.session_state.bids = db.get_bids(sys_name)
+    st.session_state.systems = db.systems()
+    st.session_state.message = {"type": "S", "message": f"System {st.session_state.curr_system} loaded"}
+    return True

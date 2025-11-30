@@ -1,4 +1,4 @@
-from bidding import get_answers, add_answer
+from bidding import get_answers, add_answer, save_system, load_system
 from config import st
 import db
 from dialogs import login_dialog, register_dialog
@@ -32,12 +32,15 @@ def main():
         st.session_state.show_login = "login"
         st.session_state.user = ""
         st.session_state.username = ""
+        st.session_state.is_admin = False
+        st.session_state.message = None
         st.session_state.opps = False
         st.session_state.edit_system = None
         st.session_state.curr_system = ""
         st.session_state.systems = []
         st.session_state.sys_info = None
         st.session_state.bids = []
+        st.session_state.loads = 0
         st.session_state.edit_bid = None
         st.session_state.delete_bid = None
 
@@ -46,6 +49,7 @@ def main():
         st.session_state.curr_system = ""
         st.session_state.user = ""
         st.session_state.username = ""
+        st.session_state.is_admin = False
         st.session_state.opps = False
         st.session_state.show_login = "login"
         st.session_state.bids = []
@@ -72,8 +76,32 @@ def main():
 
     st.session_state.opps = st.sidebar.toggle("With opps", value=st.session_state.opps, key="opps_switch")
 
-    if st.session_state.user and st.sidebar.button("Add System"):
+    if st.session_state.user and st.sidebar.button("Add System", key=f"add_sys_button", help="Create new System"):
         st.session_state.edit_system = "add"
+
+    if st.session_state.is_admin and st.sidebar.button("Save System", key="save_sys_button", help="Save System to .csv file"):
+        save_system()
+
+    if st.session_state.is_admin:
+        uploader = st.sidebar.file_uploader("Load System", type="csv",
+                                            key="file_button" + str(st.session_state.loads), help="Choose .csv file")
+        if uploader and st.sidebar.button("Load", key="load_sys_button", help="Load System from file"):
+            load_system(uploader.name)
+            st.session_state.loads += 1
+            uploader.close()
+            st.rerun()
+
+    if st.session_state.message:
+        match st.session_state.message["type"]:
+            case "I":
+                st.info(st.session_state.message["message"])
+            case "W":
+                st.warning(st.session_state.message["message"])
+            case "E":
+                st.error(st.session_state.message["message"])
+            case "S":
+                st.success(st.session_state.message["message"])
+    st.session_state.message = None
 
     if st.session_state.sys_info is None:
         st.header("Bridge bidding")

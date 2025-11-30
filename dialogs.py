@@ -16,6 +16,7 @@ def login_dialog():
         else:
             st.session_state.user = login
             st.session_state.username = log["username"]
+            st.session_state.is_admin = log["is_admin"]
             st.session_state.curr_system = log["system"]
             st.session_state.systems = db.systems()
             st.session_state.sys_info = db.get_system_info(st.session_state.curr_system)
@@ -68,9 +69,14 @@ def delete_system_dialog():
     col_yes, col_no = st.columns(2)
     if col_yes.button("✅ Yes 🗑"):
         if db.delete_system(st.session_state.curr_system):
+            st.session_state.message = {"type": "S", "message": f"System **{st.session_state.curr_system}** deleted"}
             st.session_state.curr_system = ""
             st.session_state.bids = []
             st.session_state.sys_info = None
+            if st.session_state.user:
+                db.change_user(st.session_state.user, st.session_state.curr_system)
+        else:
+            st.session_state.message = {"type": "E", "message": f"Fail to delete **{st.session_state.curr_system}**"}
         st.session_state.systems = db.systems()
         st.session_state.edit_system = None
         st.rerun()
@@ -93,6 +99,8 @@ def clone_system_dialog():
             st.session_state.curr_system = new_name
             st.session_state.systems = db.systems()
             st.session_state.sys_info = db.get_system_info(st.session_state.curr_system)
+        else:
+            st.session_state.message = {"type": "E", "message": f"Fail to clone **{st.session_state.curr_system}**"}
         st.session_state.edit_system = None
         st.rerun()
     if col_no.button("❌ Cancel"):
@@ -128,6 +136,8 @@ def edit_bid_dialog():
             st.session_state.edit_bid.pc_max = bid.pc_max
             st.session_state.edit_bid.balanced = bid.balanced
             st.session_state.edit_bid.suits = bid.suits
+        else:
+            st.session_state.message = {"type": "E", "message": f"Fail to change bid {bid.seq_str}"}
         st.session_state.edit_bid = None
         st.rerun()
     if col_no.button("❌ Cancel"):
@@ -144,6 +154,8 @@ def delete_bid_dialog():
             st.session_state.bids.remove(st.session_state.delete_bid)
             st.session_state.bids = [b for b in st.session_state.bids
                                      if not b.seq.startswith(st.session_state.delete_bid.full_seq)]
+        else:
+            st.session_state.message = {"type": "E", "message": f"Fail to delete bid {st.session_state.delete_bid.seq_str}"}
         st.session_state.delete_bid = None
         st.rerun()
     if col_no.button("❌ Cancel"):

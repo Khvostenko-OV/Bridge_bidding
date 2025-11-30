@@ -13,7 +13,8 @@ def init(db=DB_DSN) -> None:
             name TEXT PRIMARY KEY,
             title TEXT DEFAULT '',
             description TEXT DEFAULT '',
-            version TEXT DEFAULT ''
+            version TEXT DEFAULT '',
+            owner TEXT DEFAULT ''
         );
     """)
     cursor.execute("""
