@@ -2,17 +2,17 @@
 #### Simple interface for bridge bidding system's visualization on Streamlit engine
 Deployed on Streamlit-cloud https://bridge-bidding.streamlit.app/
 
-In **Read only** mode you can as *Anonym* all systems browse.
+In **Read only** mode you can as *Anonym* browse all systems.
 Or just **Register** with *login* and *password* (*username* is also recommended).
 As **User** you can new systems create or any existent system clone and then edit.
 
 Enter **Short name** of your system (it should be unique). 
-Enter **Title** (long name) of the system and description
+Enter **Title** (long name) and description
 of the main principles (use markdown).
 
 Create the tree of bids with descriptions. 
 You can also define parameters of each bid
-(point count limits, balanced or not, cards in the suits).
+(point count limits, balanced or not, number of cards in the suits).
 Who knows why?
 
 There are some auto-replaces:
