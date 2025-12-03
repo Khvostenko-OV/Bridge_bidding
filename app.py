@@ -1,4 +1,4 @@
-from bidding import get_answers, add_answer, save_system, load_system, swap_system, logout
+from bidding import logout, get_answers, add_answer, swap_system, save_system, load_system
 from config import st, README
 import db
 from dialogs import login_dialog, register_dialog
