@@ -6,9 +6,43 @@ from models import Bid
 from utils import can_pass, can_contra, can_recontra, list2seq
 
 
+def logout():
+    st.session_state.user = ""
+    st.session_state.username = ""
+    st.session_state.is_admin = False
+    st.session_state.opps = False
+    st.session_state.edit_system = None
+    st.session_state.edit_bid = None
+    st.session_state.delete_bid = None
+    st.session_state.message = None
+    st.session_state.loads = 0
+    st.session_state.show_login = "login"
+    swap_system()
+
+def swap_system(sys_name: str =""):
+    st.session_state.systems = db.systems()
+    st.session_state.curr_system = sys_name
+    if sys_name in st.session_state.systems:
+        st.session_state.sys_info = db.get_system_info(sys_name)
+        st.session_state.bids = db.get_bids(sys_name)
+        db.change_user(st.session_state.user, sys_name)
+    else:
+        st.session_state.sys_info = None
+        st.session_state.bids = []
+        db.change_user(st.session_state.user)
+
 def get_bid(bid: int, seq: str) -> Bid | None:
     """Get Bid object from bids"""
     return next((b for b in st.session_state.bids if b.bid == bid and b.seq == seq), None)
+
+def previous_bid(bid: Bid, back: int =1) -> Bid | None:
+    """Get previous bid from sequence"""
+    if bid is None or back < 0: return None
+    if back == 0: return bid
+    bids = bid.seq_list
+    back = back if st.session_state.opps else 2 * back
+    if len(bids) <= back: return None
+    return get_bid(bids[-back-1],list2seq(bids[:-back-1]))
 
 def get_answers(seq: str ="") -> list[Bid]:
     res = [b for b in st.session_state.bids if b.seq == seq and (b.bid > 0 or st.session_state.opps or not seq)]
@@ -18,7 +52,7 @@ def get_answers(seq: str ="") -> list[Bid]:
         res.insert(1, bid)
     return res
 
-def next_answer(bid: Bid = None) -> int:
+def next_answer(bid: Bid =None) -> int:
     """Next answer to bid"""
     seq = "" if bid is None else bid.full_seq + ("" if st.session_state.opps else ".0")
     answers = [b.bid for b in get_answers(seq)]
@@ -32,15 +66,11 @@ def next_answer(bid: Bid = None) -> int:
         return max(answers) + 1
     return 0 if bid is None else bid.next_bid(st.session_state.opps)
 
-def add_answer(bid: Bid = None) -> bool:
+def add_answer(bid: Bid =None) -> bool:
     """Add next answer to bid"""
     nxt = next_answer(bid)
     seq = "" if bid is None else bid.full_seq + ("" if st.session_state.opps else ".0")
-    bids = [] if bid is None else bid.seq_list
-    back = 2 + st.session_state.opps
-    prev_bid = None
-    if len(bids) > back:
-        prev_bid = get_bid(bids[-back-1], list2seq(bids[:-back-1]))
+    prev_bid = previous_bid(bid, 1 + 2 * st.session_state.opps)
     if prev_bid is None:
         new_bid = Bid(nxt, seq)
     else:
@@ -73,7 +103,7 @@ def save_system() -> bool:
     st.session_state.message = {"type": "S", "message": f"System **{st.session_state.curr_system}** saved"}
     return True
 
-def load_system(filename):
+def load_system(filename: str):
     """Load system from .csv file"""
     try:
         sys_name = filename.split(".")[0]
@@ -104,9 +134,9 @@ def load_system(filename):
         st.session_state.systems = db.systems()
         return False
 
-    st.session_state.curr_system = sys_name
-    st.session_state.sys_info = db.get_system_info(sys_name)
-    st.session_state.bids = db.get_bids(sys_name)
-    st.session_state.systems = db.systems()
-    st.session_state.message = {"type": "S", "message": f"System {st.session_state.curr_system} loaded"}
+    swap_system(sys_name)
+    st.session_state.message = {
+        "type": "S",
+        "message": f"System **{st.session_state.curr_system}** loaded ({len(st.session_state.bids)} bids)"
+    }
     return True

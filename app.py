@@ -1,5 +1,5 @@
-from bidding import get_answers, add_answer, save_system, load_system
-from config import st
+from bidding import get_answers, add_answer, save_system, load_system, swap_system, logout
+from config import st, README
 import db
 from dialogs import login_dialog, register_dialog
 from dialogs import edit_bid_dialog, delete_system_dialog, delete_bid_dialog, clone_system_dialog
@@ -27,45 +27,12 @@ def display_bid(bid: Bid, can_edit=False):
         st.session_state.edit_bid = bid
 
 def main():
-    st.set_page_config(page_title="Bridge bidding systems", layout="wide")
     if "show_login" not in st.session_state:
-        st.session_state.show_login = "login"
-        st.session_state.user = ""
-        st.session_state.username = ""
-        st.session_state.is_admin = False
-        st.session_state.message = None
-        st.session_state.opps = False
-        st.session_state.edit_system = None
-        st.session_state.curr_system = ""
-        st.session_state.systems = []
-        st.session_state.sys_info = None
-        st.session_state.bids = []
-        st.session_state.loads = 0
-        st.session_state.edit_bid = None
-        st.session_state.delete_bid = None
+        logout()
 
-    st.sidebar.markdown(f"👤 :blue-background[{st.session_state.username or st.session_state.user or '*Anonym*'}]")
+    st.sidebar.markdown(f"👤 :blue-background[{st.session_state.username or '*Anonym*'}]")
     if st.sidebar.button(f"{'Logout' if st.session_state.user else 'Login'}", key="login_button"):
-        st.session_state.curr_system = ""
-        st.session_state.user = ""
-        st.session_state.username = ""
-        st.session_state.is_admin = False
-        st.session_state.opps = False
-        st.session_state.show_login = "login"
-        st.session_state.bids = []
-        st.session_state.sys_info = None
-        st.rerun()
-
-    index = st.session_state.systems.index(st.session_state.curr_system) \
-        if st.session_state.curr_system in st.session_state.systems else None
-    system_name = st.sidebar.selectbox("Choose system",st.session_state.systems, index=index, placeholder="Select")
-    if system_name and system_name != st.session_state.curr_system and not st.session_state.edit_system:
-        st.session_state.curr_system = system_name
-        st.session_state.systems = db.systems()
-        st.session_state.sys_info = db.get_system_info(st.session_state.curr_system)
-        st.session_state.bids = db.get_bids(st.session_state.curr_system)
-        if st.session_state.user:
-            db.change_user(st.session_state.user, st.session_state.curr_system)
+        logout()
         st.rerun()
 
     if st.session_state.show_login == "login":
@@ -74,12 +41,24 @@ def main():
     if st.session_state.show_login == "signup":
         register_dialog()
 
+    index = st.session_state.systems.index(st.session_state.curr_system) \
+        if st.session_state.curr_system in st.session_state.systems else None
+    system_name = st.sidebar.selectbox("Choose system",st.session_state.systems,
+                                       index=index,
+                                       placeholder="Select",
+                                       disabled=st.session_state.edit_system is not None,
+                                       )
+    if system_name and system_name != st.session_state.curr_system:
+        swap_system(system_name)
+        st.rerun()
+
     st.session_state.opps = st.sidebar.toggle("With opps", value=st.session_state.opps, key="opps_switch")
 
-    if st.session_state.user and st.sidebar.button("Add System", key=f"add_sys_button", help="Create new System"):
+    if st.session_state.user and st.sidebar.button("Add System", key=f"add_sys_button"):
         st.session_state.edit_system = "add"
+        st.rerun()
 
-    if st.session_state.is_admin and st.sidebar.button("Save System", key="save_sys_button", help="Save System to .csv file"):
+    if st.session_state.is_admin and st.sidebar.button("Save System", key="save_sys_button"):
         save_system()
 
     if st.session_state.is_admin:
@@ -104,9 +83,10 @@ def main():
     st.session_state.message = None
 
     if st.session_state.sys_info is None:
-        st.header("Bridge bidding")
+        st.header("Bridge Bidding")
         if st.session_state.curr_system:
-            st.warning(f"Can't read System {st.session_state.curr_system}")
+            st.warning(f"Can't read System **{st.session_state.curr_system}**")
+        st.markdown(README)
     else:
 #  Browse System
         if not st.session_state.edit_system:
@@ -123,7 +103,7 @@ def main():
                 col1 = st.columns(1)[0]
             with col1.expander(
                     f"Version {st.session_state.sys_info['version']} | "
-                    f"Created by *{st.session_state.sys_info['owner_name'] or st.session_state.sys_info['owner']}*",
+                    f"Created by *{st.session_state.sys_info['owner_name']}*",
                     icon="📄"):
                 st.markdown(f"{st.session_state.sys_info["description"]}")
             if can_edit and col2.button("✏️", key="edit_system_button", help=f"Edit System description"):
@@ -167,13 +147,10 @@ def main():
             description = st.text_area("Description", key="descr")
             version = st.text_input("Version", "1.0", key="ver")
             col1, col2 = st.columns([1, 9])
-            if col1.form_submit_button("Save"):
+            if col1.form_submit_button("Create"):
                 if name:
                     if db.create_system(name, title, description, version, st.session_state.user):
-                        st.session_state.curr_system = name
-                        st.session_state.sys_info = db.get_system_info(st.session_state.curr_system)
-                        st.session_state.bids = db.get_bids(st.session_state.curr_system)
-                        st.session_state.systems = db.systems()
+                        swap_system(name)
                         st.session_state.edit_system = None
                         st.rerun()
                     else:
@@ -202,4 +179,5 @@ def main():
 
 if __name__ == "__main__":
     # db.init()
+    st.set_page_config(page_title="Bridge bidding systems", layout="wide")
     main()

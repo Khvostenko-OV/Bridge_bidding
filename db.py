@@ -79,6 +79,7 @@ def add_user(login: str, psw: str, username="", is_admin=False, db=DB_DSN) -> st
     return ""
 
 def change_user(login: str, system="", username=None, db=DB_DSN) -> bool:
+    if not login: return False
     try:
         conn = psycopg2.connect(**db)
         cursor = conn.cursor()
@@ -165,7 +166,7 @@ def get_system_info(name: str, db=DB_DSN) -> dict | None:
         if res is not None and res[4]:
             cursor.execute("SELECT username FROM users WHERE login=%s;", (res[4],))
             user = cursor.fetchone()
-            username = user[0] if user else ""
+            username = user[0] or res[4]
         else:
             username = ""
         cursor.close()

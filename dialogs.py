@@ -1,3 +1,4 @@
+from bidding import swap_system
 from config import st
 import db
 from models import Bid
@@ -15,23 +16,17 @@ def login_dialog():
             st.error(log["Error"])
         else:
             st.session_state.user = login
-            st.session_state.username = log["username"]
+            st.session_state.username = log["username"] or login
             st.session_state.is_admin = log["is_admin"]
-            st.session_state.curr_system = log["system"]
-            st.session_state.systems = db.systems()
-            st.session_state.sys_info = db.get_system_info(st.session_state.curr_system)
-            st.session_state.bids = db.get_bids(st.session_state.curr_system)
-            st.session_state.show_login = ""
+            swap_system(log["system"])
+            st.session_state.show_login = None
             st.rerun()
     if col2.button("Register"):
         st.session_state.show_login = "signup"
         st.rerun()
     if col3.button("Read only"):
-        st.session_state.user = ""
-        st.session_state.username = ""
-        st.session_state.curr_system = ""
         st.session_state.systems = db.systems()
-        st.session_state.show_login = ""
+        st.session_state.show_login = None
         st.rerun()
 
 @st.dialog("New user", dismissible=False)
@@ -40,26 +35,22 @@ def register_dialog():
     password = st.text_input("Password", type="password", key="psw")
     username = st.text_input("Username", key="usrnm")
     col1, col2, col3 = st.columns([1, 1, 2])
-    if col1.button("Create") and login and password:
+    if col1.button("Register") and login and password:
         err = db.add_user(login, password, username)
         if err:
             st.error(err)
         else:
             st.session_state.user = login
             st.session_state.username = username
-            st.session_state.curr_system = ""
             st.session_state.systems = db.systems()
-            st.session_state.show_login = ""
+            st.session_state.show_login = None
             st.rerun()
     if col2.button("Login"):
         st.session_state.show_login = "login"
         st.rerun()
     if col3.button("Read only"):
-        st.session_state.user = ""
-        st.session_state.username = ""
-        st.session_state.curr_system = ""
         st.session_state.systems = db.systems()
-        st.session_state.show_login = ""
+        st.session_state.show_login = None
         st.rerun()
 
 @st.dialog("Confirm Deletion", dismissible=False)
@@ -69,15 +60,10 @@ def delete_system_dialog():
     col_yes, col_no = st.columns(2)
     if col_yes.button("✅ Yes 🗑"):
         if db.delete_system(st.session_state.curr_system):
+            swap_system()
             st.session_state.message = {"type": "S", "message": f"System **{st.session_state.curr_system}** deleted"}
-            st.session_state.curr_system = ""
-            st.session_state.bids = []
-            st.session_state.sys_info = None
-            if st.session_state.user:
-                db.change_user(st.session_state.user, st.session_state.curr_system)
         else:
             st.session_state.message = {"type": "E", "message": f"Fail to delete **{st.session_state.curr_system}**"}
-        st.session_state.systems = db.systems()
         st.session_state.edit_system = None
         st.rerun()
     if col_no.button("❌ Cancel"):
@@ -96,9 +82,7 @@ def clone_system_dialog():
     col_yes, col_no = st.columns(2)
     if col_yes.button("✅ Yes") and new_name:
         if db.clone_system(st.session_state.curr_system, new_name, st.session_state.user):
-            st.session_state.curr_system = new_name
-            st.session_state.systems = db.systems()
-            st.session_state.sys_info = db.get_system_info(st.session_state.curr_system)
+            swap_system(new_name)
         else:
             st.session_state.message = {"type": "E", "message": f"Fail to clone **{st.session_state.curr_system}**"}
         st.session_state.edit_system = None
